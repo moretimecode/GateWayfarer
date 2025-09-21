@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Droplet.AppConfiguration.Abstractions" Version="2.8.6" />
+    <PackageReference Include="Droplet.DistributedLock" Version="2.8.6" />
+    <PackageReference Include="Droplet.DistributedLock.Redis" Version="2.8.6" />
+    <PackageReference Include="Droplet.Utility" Version="2.8.6" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.9" />
+  </ItemGroup>
+
+</Project>
