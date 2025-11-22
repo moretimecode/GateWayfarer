@@ -36,8 +36,8 @@ namespace Api
                 options.JsonSerializerOptions.WriteIndented = true;
             }).AddMvcOptions((MvcOptions mvcOptions) =>
             {
-                mvcOptions.Filters.Add<AccessLogActionFilter>(1);
-                mvcOptions.Filters.Add<UowActionActionFilter>(3);
+                // mvcOptions.Filters.Add<AccessLogActionFilter>(1);
+                // mvcOptions.Filters.Add<UowActionActionFilter>(3);
             });
             services.AddRouting(delegate (RouteOptions options)
             {
