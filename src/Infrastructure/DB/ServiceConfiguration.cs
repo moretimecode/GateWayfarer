@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Domain.Services;
+using Domain.Services.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -20,7 +21,7 @@ namespace Infrastructure.DB
             builder.Property(s => s.Code)
                 .IsRequired()
                 .HasMaxLength(50);
-            
+
             builder.HasIndex(s => s.Code)
                 .IsUnique()
                 .HasDatabaseName("IX_Services_Code");
@@ -42,6 +43,50 @@ namespace Infrastructure.DB
                     v => JsonSerializer.Deserialize<List<Destination>>(v, JsonSerializerOptions.Default) ?? new List<Destination>())
                 .HasColumnType("JSON")
                 .HasColumnName("Destinations");
+
+            // 新增：熔断器配置 - JSON存储
+            builder.Property(s => s.CircuitBreaker)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, JsonSerializerOptions.Default),
+                    v => JsonSerializer.Deserialize<CircuitBreakerConfig>(v, JsonSerializerOptions.Default)!)
+                .HasColumnType("JSON")
+                .HasColumnName("CircuitBreakerConfig");
+
+            // 新增：重试策略配置 - JSON存储
+            builder.Property(s => s.RetryPolicy)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, JsonSerializerOptions.Default),
+                    v => JsonSerializer.Deserialize<RetryPolicy>(v, JsonSerializerOptions.Default)!)
+                .HasColumnType("JSON")
+                .HasColumnName("RetryPolicyConfig");
+
+            // 新增：降级策略配置 - JSON存储
+            builder.Property(s => s.FallbackStrategy)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, JsonSerializerOptions.Default),
+                    v => JsonSerializer.Deserialize<FallbackStrategy>(v, JsonSerializerOptions.Default)!)
+                .HasColumnType("JSON")
+                .HasColumnName("FallbackStrategyConfig");
+
+            // 新增：超时配置 - JSON存储
+            builder.Property(s => s.TimeoutConfig)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, JsonSerializerOptions.Default),
+                    v => JsonSerializer.Deserialize<TimeoutConfig>(v, JsonSerializerOptions.Default)!)
+                .HasColumnType("JSON")
+                .HasColumnName("TimeoutConfig");
+
+            builder.Property(s => s.TimeoutConfig)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, JsonSerializerOptions.Default),
+                    v => JsonSerializer.Deserialize<TimeoutConfig>(v, JsonSerializerOptions.Default)!)
+                .HasColumnType("JSON")
+                .HasColumnName("TimeoutConfig");
+            
+        builder.OwnsOne(s => s.ProtocolConfig, pc =>
+        {
+            pc.ToJson("ProtocolConfig"); 
+        });
         }
     }
 }

@@ -3,6 +3,7 @@ using Application;
 using Droplet.AppConfiguration;
 using Droplet.AspNetCore.Filters;
 using Infrastructure;
+using Infrastructure.Endpoints;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.OpenApi.Models;
 using Shared;
@@ -88,7 +89,7 @@ namespace Api
             return services;
         }
 
-        
+
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
@@ -96,7 +97,7 @@ namespace Api
             {
                 app.UseDeveloperExceptionPage();
             }
-            // Web API
+
             app.UseSwagger();
             app.UseSwaggerUI(options =>
             {
@@ -107,6 +108,41 @@ namespace Api
 
             app.UseEndpoints(endpoints =>
             {
+                var dynamicEndpointManager = endpoints.ServiceProvider.GetRequiredService<DynamicEndpointManager>();
+                endpoints.DataSources.Add(dynamicEndpointManager);
+
+                // 注册静态路由
+                var endpointRegistrar = endpoints.ServiceProvider.GetRequiredService<IStartupEndpointRegistrar>();
+                endpointRegistrar.RegisterAllEndpoints(endpoints);
+
+                // 订阅配置变更事件
+                var eventPublisher = endpoints.ServiceProvider.GetRequiredService<RouteConfigurationEventPublisher>();
+                var hotUpdateCoordinator = endpoints.ServiceProvider.GetRequiredService<IHotUpdateCoordinator>();
+                var logger = endpoints.ServiceProvider.GetRequiredService<ILogger<Startup>>();
+
+                eventPublisher.ConfigurationChanged += async (sender, args) =>
+                {
+                    logger.LogInformation("🚀 接收到路由配置变更事件，开始热更新");
+
+                    var result = await hotUpdateCoordinator.ApplyChangesAsync(args.Changes);
+
+                    if (result.Success)
+                    {
+                        logger.LogInformation("✅ 热更新成功完成，耗时: {Duration}ms，影响路由: {Count}个",
+                            result.Duration.TotalMilliseconds, result.AffectedRoutesCount);
+                    }
+                    else
+                    {
+                        logger.LogError("❌ 热更新失败: {Message}", result.Message);
+                        foreach (var error in result.Errors)
+                        {
+                            logger.LogError("  - {Error}", error);
+                        }
+                    }
+                };
+
+                logger.LogInformation("📡 路由配置监听器已就绪，动态路由系统已启动");
+
                 endpoints.MapControllers();
             });
 

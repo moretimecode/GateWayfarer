@@ -83,7 +83,6 @@ StyleCopReport.xml
 *.tlh
 *.tmp
 *.tmp_proj
-*_wpftmp.csproj
 *.log
 *.vspscc
 *.vssscc
@@ -436,6 +435,4 @@ $RECYCLE.BIN/
 /src/FM.Pro.Finance.Client/ProfinanceGrpc.cs
 /proto/pro/finance/descriptor.pb
 
-/pro
-/src/At.Locazy.Background.Host/terms/*
 src/At.Locazy.Background.Host/Properties/launchSettings.json

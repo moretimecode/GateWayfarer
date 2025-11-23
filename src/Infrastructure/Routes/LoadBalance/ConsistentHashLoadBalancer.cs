@@ -15,6 +15,7 @@ namespace Domain.Services.LoadBalancing
         private readonly SortedDictionary<uint, Destination> _ring = [];
         private readonly int _virtualNodes = 150;
         private readonly SHA1 _hasher = SHA1.Create();
+        private readonly object _lockObject = new object();
 
         public override LoadBalanceType Type => LoadBalanceType.ConsistentHash;
 
@@ -23,11 +24,17 @@ namespace Domain.Services.LoadBalancing
         /// </summary>
         public void AddDestination(Destination destination)
         {
-            for (int i = 0; i < _virtualNodes; i++)
+            lock (_lockObject)
             {
-                var virtualKey = $"{destination.Code}:{i}";
-                var hash = ComputeHash(virtualKey);
-                _ring[hash] = destination;
+                for (int i = 0; i < _virtualNodes; i++)
+                {
+                    var virtualKey = $"{destination.Code}:{i}";
+                    var hash = ComputeHash(virtualKey);
+                    _ring[hash] = destination;
+                }
+
+                Logger.LogInformation("Added destination {DestinationCode} with {VirtualNodes} virtual nodes to hash ring",
+                    destination.Code, _virtualNodes);
             }
         }
 
@@ -36,11 +43,17 @@ namespace Domain.Services.LoadBalancing
         /// </summary>
         public void RemoveDestination(Destination destination)
         {
-            for (int i = 0; i < _virtualNodes; i++)
+            lock (_lockObject)
             {
-                var virtualKey = $"{destination.Code}:{i}";
-                var hash = ComputeHash(virtualKey);
-                _ring.Remove(hash);
+                for (int i = 0; i < _virtualNodes; i++)
+                {
+                    var virtualKey = $"{destination.Code}:{i}";
+                    var hash = ComputeHash(virtualKey);
+                    _ring.Remove(hash);
+                }
+
+                Logger.LogInformation("Removed destination {DestinationCode} with {VirtualNodes} virtual nodes from hash ring",
+                    destination.Code, _virtualNodes);
             }
         }
 
@@ -49,13 +62,19 @@ namespace Domain.Services.LoadBalancing
         /// </summary>
         public Destination? SelectDestination(string key)
         {
-            if (_ring.Count == 0) return null;
+            if (_ring.Count == 0)
+            {
+                Logger.LogWarning("Hash ring is empty, cannot select destination for key: {Key}", key);
+                return null;
+            }
 
             var hash = ComputeHash(key);
-            
-            var node = _ring.FirstOrDefault(kvp => kvp.Key >= hash);
+            Logger.LogDebug("Computed hash {Hash} for key: {Key}", hash, key);
 
-            return node.Key == 0 ? _ring.First().Value : node.Value;
+            // 使用二分查找找到第一个大于等于当前哈希值的节点
+            var node = FindNextNode(hash);
+
+            return node;
         }
 
         protected override Destination SelectDestinationCore(List<Destination> destinations, LoadBalanceContext context)
@@ -155,6 +174,36 @@ namespace Domain.Services.LoadBalancing
             var bytes = Encoding.UTF8.GetBytes(input);
             var hash = _hasher.ComputeHash(bytes);
             return BitConverter.ToUInt32(hash, 0);
+        }
+
+        /// <summary>
+        /// 获取当前哈希环的状态（用于调试和监控）
+        /// </summary>
+        public Dictionary<uint, string> GetRingStatus()
+        {
+            lock (_lockObject)
+            {
+                return _ring.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Code);
+            }
+        }
+
+        /// <summary>
+        /// 获取虚拟节点数量
+        /// </summary>
+        public int GetVirtualNodesCount()
+        {
+            return _virtualNodes;
+        }
+
+        /// <summary>
+        /// 获取当前环中的节点数量
+        /// </summary>
+        public int GetRingNodesCount()
+        {
+            lock (_lockObject)
+            {
+                return _ring.Count;
+            }
         }
     }
 }

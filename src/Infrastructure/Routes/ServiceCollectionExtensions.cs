@@ -22,6 +22,7 @@ namespace Infrastructure.Routes
             services.AddKeyedScoped<IRouteParameterExtractor, PrefixParameterExtractor>(RouteMatchType.Prefix);
             services.AddKeyedScoped<IRouteParameterExtractor, ExactParameterExtractor>(RouteMatchType.Exact);
             services.AddKeyedScoped<IRouteParameterExtractor, RegexParameterExtractor>(RouteMatchType.Regex);
+            services.AddSingleton<IRouteParameterExtractor, TemplateParameterExtractor>();
 
             services.AddScoped<IRouteMatchingService, RouteMatchingService>();
             services.AddScoped<IRouteValidationService, RouteValidationService>();

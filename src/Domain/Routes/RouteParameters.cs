@@ -8,12 +8,14 @@ public readonly struct RouteParameters
     public readonly IReadOnlyDictionary<string, string> PathParameters;
     public readonly IReadOnlyDictionary<string, string> QueryParameters;
 
-    public RouteParameters(Dictionary<string, string>? pathParameters = null, 
+    public static RouteParameters Empty => new();
+
+    public RouteParameters(Dictionary<string, string>? pathParameters = null,
                           Dictionary<string, string>? queryParameters = null)
     {
         _pathParameters = pathParameters ?? new Dictionary<string, string>();
         _queryParameters = queryParameters ?? new Dictionary<string, string>();
-        
+
         PathParameters = _pathParameters.AsReadOnly();
         QueryParameters = _queryParameters.AsReadOnly();
     }

@@ -1,5 +1,5 @@
 using System.Text.RegularExpressions;
-using Domain.Routes.Rules;
+using Domain.Routes.Configuration;
 using Droplet.Data.Entities;
 
 namespace Domain.Routes;
@@ -45,6 +45,10 @@ public class Route : AggregateRoot
     /// 引用的服务代码
     /// </summary>
     public string ServiceCode { get; private set; }
+
+    public RequestBatchingConfig BatchingConfig { get; private set; }
+    public RequestForwardingConfig ForwardingConfig { get; private set; }
+
 
     private Route()
     {
@@ -98,8 +102,32 @@ public class Route : AggregateRoot
             RouteMatchType.Exact => string.Equals(Path, requestPath, StringComparison.OrdinalIgnoreCase),
             RouteMatchType.Prefix => requestPath.StartsWith(Path, StringComparison.OrdinalIgnoreCase),
             RouteMatchType.Regex => Regex.IsMatch(requestPath, Path),
+            RouteMatchType.Template => MatchTemplate(Path, requestPath),
             _ => false
         };
+    }
+
+    private static bool MatchTemplate(string template, string requestPath)
+    {
+        var templateSegments = template.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var pathSegments = requestPath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+        if (templateSegments.Length != pathSegments.Length)
+            return false;
+
+        for (int i = 0; i < templateSegments.Length; i++)
+        {
+            var templateSegment = templateSegments[i];
+            var pathSegment = pathSegments[i];
+
+            if (templateSegment.StartsWith("{") && templateSegment.EndsWith("}"))
+                continue;
+
+            if (!string.Equals(templateSegment, pathSegment, StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -154,5 +182,28 @@ public class Route : AggregateRoot
     public void Disable()
     {
         IsEnabled = false;
+    }
+
+    public Route WithBatchingConfig(RequestBatchingConfig batchingConfig)
+    {
+        BatchingConfig = batchingConfig ?? throw new ArgumentNullException(nameof(batchingConfig));
+        return this;
+    }
+
+    public Route WithForwardingConfig(RequestForwardingConfig forwardingConfig)
+    {
+        ForwardingConfig = forwardingConfig ?? throw new ArgumentNullException(nameof(forwardingConfig));
+        return this;
+    }
+
+    // 添加验证方法
+    public void ValidateConfiguration()
+    {
+
+        if (BatchingConfig is null)
+            BatchingConfig = RequestBatchingConfig.Disabled();
+
+        if (ForwardingConfig is null)
+            ForwardingConfig = RequestForwardingConfig.Default();
     }
 }

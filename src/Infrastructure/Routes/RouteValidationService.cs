@@ -8,7 +8,7 @@ public class RouteValidationService(IRouteRepository routeRepository) : IRouteVa
 {
     private readonly IRouteRepository _routeRepository = routeRepository ?? throw new ArgumentNullException(nameof(routeRepository));
 
-    public async Task<ValidationResult> ValidateRouteAsync(Route route)
+    public async Task<ValidationResult> ValidateRouteAsync(Domain.Routes.Route route)
     {
         if (route == null)
         {
@@ -25,7 +25,7 @@ public class RouteValidationService(IRouteRepository routeRepository) : IRouteVa
         return result;
     }
 
-    public async Task<ValidationResult> ValidateRouteConflictAsync(Route newRoute)
+    public async Task<ValidationResult> ValidateRouteConflictAsync(Domain.Routes.Route newRoute)
     {
         if (newRoute == null)
         {
@@ -76,7 +76,7 @@ public class RouteValidationService(IRouteRepository routeRepository) : IRouteVa
     }
 
 
-    public async Task<List<ValidationResult>> ValidateRoutesAsync(List<Route> routes)
+    public async Task<List<ValidationResult>> ValidateRoutesAsync(List<Domain.Routes.Route> routes)
     {
        var results = new List<ValidationResult>();
 
@@ -92,7 +92,7 @@ public class RouteValidationService(IRouteRepository routeRepository) : IRouteVa
         return results;
     }
     
-     private bool HasRouteConflict(Route existing, Route newRoute)
+     private bool HasRouteConflict(Domain.Routes.Route existing, Domain.Routes.Route newRoute)
     {
         if ((existing.HttpMethods & newRoute.HttpMethods) ==Domain.Routes.HttpMethod.None)
             return false;
@@ -100,7 +100,7 @@ public class RouteValidationService(IRouteRepository routeRepository) : IRouteVa
         return PathsConflict(existing, newRoute);
     }
 
-    private bool PathsConflict(Route route1, Route route2)
+    private bool PathsConflict(Domain.Routes.Route route1, Domain.Routes.Route route2)
     {
         if (route1.MatchType == RouteMatchType.Exact && route2.MatchType == RouteMatchType.Exact)
         {

@@ -8,10 +8,10 @@ namespace Infrastructure.Routes
     {
         public RouteConfigurationProfile()
         {
-              CreateMap<List<Route>, RouteOptions>()
+              CreateMap<List<Domain.Routes.Route>, Domain.Routes.Configuration.RouteOptions>()
                 .ForMember(dest => dest.Routes, opt => opt.MapFrom(src => src));
                 
-            CreateMap<Route, RouteConfigItem>();
+            CreateMap<Domain.Routes.Route, RouteConfigItem>();
         }
     }
 }

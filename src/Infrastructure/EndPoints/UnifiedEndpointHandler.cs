@@ -1,6 +1,11 @@
 using Domain.Routes;
 using Domain.Routes.Configuration;
+using Domain.Routes.Contexts;
+using Domain.Routes.Services;
+using Infrastructure.Protocol;
+using Infrastructure.Protocol.Streaming;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Infrastructure.Endpoints
@@ -25,11 +30,11 @@ namespace Infrastructure.Endpoints
         /// <summary>
         /// 处理HTTP请求
         /// </summary>
-        public async Task HandleAsync(HttpContext context, RouteConfigItem routeConfig)
+        public async Task HandleAsync(Microsoft.AspNetCore.Http.HttpContext context, RouteConfigItem routeConfig)
         {
             try
             {
-                _logger.LogDebug("统一处理器处理请求: {RouteName}, Path: {Path}, MatchType: {MatchType}", 
+                _logger.LogDebug("统一处理器处理请求: {RouteName}, Path: {Path}, MatchType: {MatchType}",
                     routeConfig.Name, context.Request.Path, routeConfig.MatchType);
 
                 // 验证HTTP方法
@@ -45,37 +50,148 @@ namespace Infrastructure.Endpoints
                 context.Items["RouteName"] = routeConfig.Name;
                 context.Items["ServiceCode"] = routeConfig.ServiceCode;
 
-                // 这里可以添加具体的业务逻辑
-                // 比如：转发到后端服务、执行本地处理等
-
-                // 临时响应（后续会替换为实际的业务逻辑）
-                context.Response.StatusCode = 200;
-                context.Response.ContentType = "application/json";
-                
-                var response = new
-                {
-                    success = true,
-                    message = "Route handled successfully",
-                    route = routeConfig.Name,
-                    path = context.Request.Path.Value,
-                    method = context.Request.Method,
-                    serviceCode = routeConfig.ServiceCode,
-                    matchType = routeConfig.MatchType.ToString(),
-                    timestamp = DateTime.UtcNow
-                };
-
-                await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(response));
+                // ========== 新增：转发逻辑 ==========
+                await ForwardRequestAsync(context, routeConfig);
 
                 _logger.LogInformation("✅ 成功处理请求: {RouteName}", routeConfig.Name);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "❌ 统一处理器处理请求失败: {RouteName}", routeConfig.Name);
-                
+
                 if (!context.Response.HasStarted)
                 {
                     context.Response.StatusCode = 500;
                     await context.Response.WriteAsync("Internal Server Error");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 转发请求到后端服务
+        /// </summary>
+        private async Task ForwardRequestAsync(Microsoft.AspNetCore.Http.HttpContext context, RouteConfigItem routeConfig)
+        {
+            // 1. 获取路由匹配服务（负责负载均衡和健康检查）
+            var routeMatchingService = _serviceProvider.GetRequiredService<IRouteMatchingService>();
+            var gatewayRequest = context.FromHttpContext();
+            var routeMatchResult = await routeMatchingService.MatchAsync(gatewayRequest);
+
+            if (routeMatchResult == null)
+            {
+                context.Response.StatusCode = 503;
+                await context.Response.WriteAsync("No available destination");
+                return;
+            }
+
+            // 2. 判断是否需要流式转发
+            var streamingForwarder = _serviceProvider.GetService<IStreamingForwarder>();
+
+            if (streamingForwarder != null && streamingForwarder.ShouldUseStreaming(context))
+            {
+                // 使用流式转发
+                await ForwardWithStreamingAsync(context, routeMatchResult, streamingForwarder);
+            }
+            else
+            {
+                // 使用标准协议转发
+                await ForwardWithProtocolAsync(context, routeMatchResult);
+            }
+        }
+
+        /// <summary>
+        /// 使用流式转发
+        /// </summary>
+        private async Task ForwardWithStreamingAsync(
+            HttpContext context,
+            RouteMatchResult routeMatchResult,
+            IStreamingForwarder streamingForwarder)
+        {
+            _logger.LogDebug("使用流式转发: ContentLength={ContentLength}", context.Request.ContentLength);
+
+            StreamingForwardingResponse? response = null;
+            try
+            {
+                response = await streamingForwarder.ForwardAsync(
+                    context,
+                    routeMatchResult,
+                    context.RequestAborted);
+
+                if (response.IsSuccess)
+                {
+                    await response.WriteToHttpContextAsync(context, cancellationToken: context.RequestAborted);
+                }
+                else
+                {
+                    context.Response.StatusCode = response.StatusCode;
+                    await context.Response.WriteAsync(response.ErrorMessage ?? "Streaming forwarding failed");
+                }
+            }
+            finally
+            {
+                if (response != null)
+                {
+                    await response.DisposeAsync();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 使用标准协议转发
+        /// </summary>
+        private async Task ForwardWithProtocolAsync(
+            HttpContext context,
+            RouteMatchResult routeMatchResult)
+        {
+            _logger.LogDebug("使用标准协议转发");
+
+            var protocolForwarder = _serviceProvider.GetService<IAdaptiveProtocolForwarder>();
+
+            if (protocolForwarder == null)
+            {
+                // 如果没有注册协议转发器，返回临时响应（保持你原有的逻辑）
+                context.Response.StatusCode = 200;
+                context.Response.ContentType = "application/json";
+
+                var response = new
+                {
+                    success = true,
+                    message = "Route handled successfully",
+                    route = routeMatchResult.Route.Name,
+                    path = context.Request.Path.Value,
+                    method = context.Request.Method,
+                    serviceCode = routeMatchResult.Route.ServiceCode,
+                    destination = routeMatchResult?.SelectedDestination?.GetAddress() ?? "",
+                    timestamp = DateTime.UtcNow
+                };
+
+                await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(response));
+                return;
+            }
+
+            ForwardingResponse? forwardingResponse = null;
+            try
+            {
+                forwardingResponse = await protocolForwarder.ForwardToDestinationAsync(
+                    context,
+                    routeMatchResult,
+                    context.RequestAborted);
+
+                if (forwardingResponse.IsSuccess)
+                {
+                    await forwardingResponse.WriteToHttpContextAsync(context);
+                }
+                else
+                {
+                    context.Response.StatusCode = forwardingResponse.StatusCode;
+                    await context.Response.WriteAsync(forwardingResponse.ErrorMessage ?? "Forwarding failed");
+                }
+            }
+            finally
+            {
+                if (forwardingResponse != null)
+                {
+                    await forwardingResponse.DisposeAsync();
                 }
             }
         }

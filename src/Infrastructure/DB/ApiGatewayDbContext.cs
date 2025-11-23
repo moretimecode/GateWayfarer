@@ -7,7 +7,7 @@ namespace Infrastructure.DB;
 public class ApiGatewayDbContext(DbContextOptions<ApiGatewayDbContext> options) : DbContext(options)
 {
 
-    public DbSet<Route> Routes { get; set; } = null!;
+    public DbSet<Domain.Routes.Route> Routes { get; set; } = null!;
     public DbSet<Service> Services { get; set; } = null!;
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -4,6 +4,6 @@ namespace Domain.Routes;
 
 public interface IRouteRepository : IRepository<Route, int>
 {
-    Task<Route?> GetRouteByNameAsync(string name);
+    Task<Domain.Routes.Route?> GetRouteByNameAsync(string name);
     ValueTask<List<Route>> GetEnabledRoutesOrderedByPriorityAsync();
 }

@@ -18,7 +18,7 @@ public class AutoMapperEntityMapper<TEntity, TConfig> : IEntityMapper<TEntity, T
     {
         if (assemblies == null || assemblies.Length == 0)
         {
-            assemblies = new[] { Assembly.GetCallingAssembly(), Assembly.GetExecutingAssembly() };
+            assemblies = [Assembly.GetCallingAssembly(), Assembly.GetExecutingAssembly()];
         }
 
         var config = new MapperConfiguration(cfg =>

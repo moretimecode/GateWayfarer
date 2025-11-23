@@ -1,32 +1,37 @@
+using Domain.Services.Configuration;
 using Domain.Services.Services;
 using Droplet.Data.Entities;
 
 namespace Domain.Services
 {
-  public class Service : AggregateRoot
+    public class Service : AggregateRoot
     {
         /// <summary>
         /// 服务的业务唯一标识
         /// </summary>
         public string Code { get; private set; }
-        
+
         /// <summary>
         /// 服务名称
         /// </summary>
         public string Name { get; private set; }
-        
+
         /// <summary>
         /// 健康检查配置
         /// </summary>
         public HealthCheckConfig HealthCheck { get; private set; }
-        
+
         /// <summary>
         /// 目标实例列表
         /// </summary>
         private readonly List<Destination> _destinations = [];
         public IReadOnlyList<Destination> Destinations => _destinations.AsReadOnly();
+        public CircuitBreakerConfig CircuitBreaker { get; private set; }
+        public RetryPolicy RetryPolicy { get; private set; }
+        public FallbackStrategy FallbackStrategy { get; private set; }
+        public TimeoutConfig TimeoutConfig { get; private set; }
+        public ServiceProtocolConfig ProtocolConfig { get; private set; }
 
-        // EF Core 需要的私有构造函数
         private Service()
         {
             Code = string.Empty;
@@ -38,18 +43,19 @@ namespace Domain.Services
             string code,
             string name,
             HealthCheckConfig? healthCheck = null,
-            List<Destination>? destinations = null)
+            List<Destination>? destinations = null,
+            ServiceProtocolConfig? protocolConfig = null)
         {
             if (string.IsNullOrWhiteSpace(code))
                 throw new ArgumentException("Service code cannot be empty", nameof(code));
-                
+
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Service name cannot be empty", nameof(name));
 
             Code = code;
             Name = name;
             HealthCheck = healthCheck ?? new HealthCheckConfig();
-            
+
             if (destinations != null)
             {
                 foreach (var destination in destinations)
@@ -57,21 +63,52 @@ namespace Domain.Services
                     AddDestination(destination);
                 }
             }
+            ProtocolConfig = protocolConfig ?? ServiceProtocolConfig.CreateDefault();
         }
 
+        public Service WithErrorHandling(CircuitBreakerConfig? circuitBreaker = null,
+              RetryPolicy? retryPolicy = null, FallbackStrategy? fallbackStrategy = null,
+              TimeoutConfig? timeoutConfig = null)
+        {
+            CircuitBreaker = circuitBreaker ?? CircuitBreakerConfig.Default();
+            RetryPolicy = retryPolicy ?? RetryPolicy.Default();
+            FallbackStrategy = fallbackStrategy ?? FallbackStrategy.None();
+            TimeoutConfig = timeoutConfig ?? TimeoutConfig.Default();
+
+            return this;
+        }
+        public void UpdateProtocolConfig(ServiceProtocolConfig protocolConfig)
+        {
+            ProtocolConfig = protocolConfig ?? throw new ArgumentNullException(nameof(protocolConfig));
+        }
         /// <summary>
         /// 添加目标实例
         /// </summary>
         public void AddDestination(Destination destination)
         {
-            if (destination  is null)
+            if (destination is null)
                 throw new ArgumentNullException(nameof(destination));
-                
+
             // 检查Code是否重复
             if (_destinations.Any(d => d.Code == destination.Code))
                 throw new InvalidOperationException($"Destination with code '{destination.Code}' already exists");
-                
+
             _destinations.Add(destination);
+        }
+
+        public void ValidateErrorHandlingConfig()
+        {
+            if (CircuitBreaker is null)
+                throw new InvalidOperationException("Circuit breaker configuration is required");
+
+            if (RetryPolicy is null)
+                throw new InvalidOperationException("Retry policy configuration is required");
+
+            if (FallbackStrategy is null)
+                throw new InvalidOperationException("Fallback strategy configuration is required");
+
+            if (TimeoutConfig is null)
+                throw new InvalidOperationException("Timeout configuration is required");
         }
 
         /// <summary>
@@ -80,7 +117,7 @@ namespace Domain.Services
         public bool RemoveDestination(string destinationCode)
         {
             var destination = _destinations.FirstOrDefault(d => d.Code == destinationCode);
-            if (destination is not  null)
+            if (destination is not null)
             {
                 _destinations.Remove(destination);
                 return true;
@@ -95,13 +132,13 @@ namespace Domain.Services
         {
             if (newDestinations == null)
                 throw new ArgumentNullException(nameof(newDestinations));
-                
+
             // 检查新列表中是否有重复的Code
             var duplicateCodes = newDestinations
                 .GroupBy(d => d.Code)
                 .Where(g => g.Count() > 1)
                 .Select(g => g.Key);
-                
+
             if (duplicateCodes.Any())
                 throw new InvalidOperationException($"Duplicate destination codes found: {string.Join(", ", duplicateCodes)}");
 
@@ -120,7 +157,7 @@ namespace Domain.Services
         /// <summary>
         /// 获取健康的目标实例列表（核心业务方法）
         /// </summary>
-        public  List<Destination> GetHealthyDestinations(IHealthCalculationService healthService)
+        public List<Destination> GetHealthyDestinations(IHealthCalculationService healthService)
         {
             if (!_destinations.Any())
                 return [];
@@ -129,7 +166,7 @@ namespace Domain.Services
 
             foreach (var destination in _destinations)
             {
-                var isHealthy =  healthService.IsHealthy(destination, HealthCheck);
+                var isHealthy = healthService.IsHealthy(destination, HealthCheck);
                 if (isHealthy)
                 {
                     healthyDestinations.Add(destination);

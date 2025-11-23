@@ -1,13 +1,16 @@
+using System.Text.Json;
 using Domain.Routes;
+using Domain.Routes.Configuration;
+using Infrastructure.Protocol;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Infrastructure.DB;
 
 
-public class RouteConfiguration : IEntityTypeConfiguration<Route>
+public class RouteConfiguration : IEntityTypeConfiguration<Domain.Routes.Route>
 {
-    public void Configure(EntityTypeBuilder<Route> builder)
+    public void Configure(EntityTypeBuilder<Domain.Routes.Route> builder)
     {
         builder.ToTable("Routes");
         builder.HasKey(r => r.Id);
@@ -51,5 +54,21 @@ public class RouteConfiguration : IEntityTypeConfiguration<Route>
 
         builder.HasIndex(r => new { r.IsEnabled, r.Priority })
             .HasDatabaseName("IX_Routes_Enabled_Priority");
+
+        // 新增：请求批处理配置 - JSON存储
+        builder.Property(r => r.BatchingConfig)
+            .HasConversion(
+                v => JsonSerializer.Serialize(v, JsonSerializerOptions.Default),
+                v => JsonSerializer.Deserialize<RequestBatchingConfig>(v, JsonSerializerOptions.Default)!)
+            .HasColumnType("JSON")
+            .HasColumnName("BatchingConfig");
+
+        // 新增：请求转发配置 - JSON存储
+        builder.Property(r => r.ForwardingConfig)
+            .HasConversion(
+                v => JsonSerializer.Serialize(v, JsonSerializerOptions.Default),
+                v => JsonSerializer.Deserialize<RequestForwardingConfig>(v, JsonSerializerOptions.Default)!)
+            .HasColumnType("JSON")
+            .HasColumnName("ForwardingConfig");
     }
 }

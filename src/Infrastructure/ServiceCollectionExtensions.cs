@@ -1,4 +1,6 @@
 ﻿using Infrastructure.DB;
+using Infrastructure.EndPoints;
+using Infrastructure.Protocol;
 using Infrastructure.Routes;
 using Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
@@ -32,6 +34,25 @@ namespace Infrastructure
 
             services.AddRouteServices();
             services.AddServiceService(configuration);
+            services.AddEndpointServices();
+            services.AddProtocolSupport(options =>
+            {
+                options.DefaultTimeout = TimeSpan.FromSeconds(30);
+                options.EnableProtocolNegotiation = true;
+                options.LogProtocolDowngrade = true;
+            });
+                    services.AddStreamingForwarding(options =>
+        {
+            options.BufferSize = 81920; // 80KB
+            options.StreamTimeout = TimeSpan.FromMinutes(30);
+            options.StreamingThreshold = 10 * 1024 * 1024; // 10MB
+            options.MaxConcurrentStreams = 100;
+            options.EnableStrictHeaderFiltering = true;
+            options.AddProxyHeaders = true;
+            options.ValidateContentLength = true;
+            options.EnableRangeSupport = true;
+        });
+
             return services;
         }
     }

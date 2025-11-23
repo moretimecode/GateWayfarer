@@ -7,10 +7,10 @@ using Microsoft.Extensions.Options;
 
 namespace Infrastructure.Routes
 {
-    public class RouteRepository(IUnitOfWork unitOfWork, IOptionsMonitor<RouteOptions> routeOption) : EntityFrameworkCoreRepository<Route, int>(unitOfWork), IRouteRepository
+    public class RouteRepository(IUnitOfWork unitOfWork, IOptionsMonitor<Domain.Routes.Configuration.RouteOptions> routeOption) : EntityFrameworkCoreRepository<Domain.Routes.Route, int>(unitOfWork), IRouteRepository
     {
-        private readonly RouteOptions _routes = routeOption.CurrentValue;
-        public async Task<Route?> GetRouteByNameAsync(string name)
+        private readonly Domain.Routes.Configuration.RouteOptions _routes = routeOption.CurrentValue;
+        public async Task<Domain.Routes.Route?> GetRouteByNameAsync(string name)
         {
             if (string.IsNullOrWhiteSpace(name))
                 return null;
@@ -56,12 +56,12 @@ namespace Infrastructure.Routes
 
         }
 
-        public ValueTask<List<Route>> GetEnabledRoutesOrderedByPriorityAsync()
+        public ValueTask<List<Domain.Routes.Route>> GetEnabledRoutesOrderedByPriorityAsync()
         {
             var result = _routes.Routes.Where(r => r.IsEnabled)
                .OrderByDescending(r => r.Priority)
                .ThenBy(r => r.Name)
-               .Select(x => new Route(x.Name, x.Path, x.ServiceCode, x.HttpMethods, x.Priority, x.IsEnabled, x.MatchType, x.LoadBalanceType))
+               .Select(x => new Domain.Routes.Route(x.Name, x.Path, x.ServiceCode, x.HttpMethods, x.Priority, x.IsEnabled, x.MatchType, x.LoadBalanceType))
                .ToList();
             return ValueTask.FromResult(result);
         }

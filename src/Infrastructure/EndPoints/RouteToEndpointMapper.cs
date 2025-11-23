@@ -58,8 +58,8 @@ namespace Infrastructure.Endpoints
             var finalPattern = routeConfig.MatchType switch
             {
                 RouteMatchType.Exact => routeConfig.Path,
-                RouteMatchType.Prefix => routeConfig.Path.EndsWith('/') 
-                    ? $"{routeConfig.Path}{{**catchAll}}" 
+                RouteMatchType.Prefix => routeConfig.Path.EndsWith('/')
+                    ? $"{routeConfig.Path}{{**catchAll}}"
                     : $"{routeConfig.Path}/{{**catchAll}}",
                 RouteMatchType.Regex => throw new InvalidOperationException("Regex routes not supported here"),
                 _ => routeConfig.Path
@@ -89,7 +89,8 @@ namespace Infrastructure.Endpoints
         {
             return async (HttpContext context) =>
             {
-                var handler = context.RequestServices.GetRequiredService<UnifiedEndpointHandler>();
+                var handlerFactory = context.RequestServices.GetRequiredService<IEndpointHandlerFactory>();
+                var handler = handlerFactory.CreateHandler(routeConfig);
                 await handler.HandleAsync(context, routeConfig);
             };
         }

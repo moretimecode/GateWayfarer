@@ -54,6 +54,8 @@ public class Program
         .ConfigureServices((context, services) =>
         {
             services.Configure<ApiGatewayOptions>(context.Configuration.GetSection(ApiGatewayOptions.SectionName));
+            services.Configure<Domain.Routes.Configuration.RouteOptions>(context.Configuration.GetSection(Domain.Routes.Configuration.RouteOptions.SectionName));
+            services.Configure<ServiceOptions>(context.Configuration.GetSection(ServiceOptions.SectionName));
         })
         .ConfigureLogging((context, logging) =>
         {
