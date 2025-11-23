@@ -4,6 +4,7 @@
     <PackageReference Include="Droplet.Data" Version="2.8.6" />
     <PackageReference Include="Droplet.Utility" Version="2.8.6" />
 	  <PackageReference Include="AutoMapper" Version="13.0.0" />
+	  <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <ItemGroup>

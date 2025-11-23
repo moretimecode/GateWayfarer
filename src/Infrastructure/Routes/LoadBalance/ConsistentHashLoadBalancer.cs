@@ -60,7 +60,94 @@ namespace Domain.Services.LoadBalancing
 
         protected override Destination SelectDestinationCore(List<Destination> destinations, LoadBalanceContext context)
         {
-            throw new NotImplementedException();
+            // 确保哈希环与当前可用的目标节点同步
+            SyncRingWithDestinations(destinations);
+
+            // 从上下文中获取哈希键，如果没有则使用默认值
+            var hashKey = GetHashKeyFromContext(context);
+
+            var selectedDestination = SelectDestination(hashKey);
+
+            if (selectedDestination == null)
+            {
+                Logger.LogWarning("No destination found for hash key: {HashKey}, falling back to first available destination", hashKey);
+                return destinations.FirstOrDefault() ?? throw new InvalidOperationException("No available destinations");
+            }
+
+            Logger.LogInformation("Selected destination {DestinationCode} for hash key: {HashKey}",
+                selectedDestination.Code, hashKey);
+
+            return selectedDestination;
+        }
+
+        /// <summary>
+        /// 同步哈希环与当前可用的目标节点
+        /// </summary>
+        private void SyncRingWithDestinations(List<Destination> currentDestinations)
+        {
+            lock (_lockObject)
+            {
+                // 获取当前环中所有唯一的目标节点
+                var currentRingDestinations = _ring.Values.Distinct().ToList();
+
+                // 移除不再可用的节点
+                var destinationsToRemove = currentRingDestinations
+                    .Where(dest => !currentDestinations.Any(cd => cd.Code == dest.Code))
+                    .ToList();
+
+                foreach (var dest in destinationsToRemove)
+                {
+                    RemoveDestination(dest);
+                }
+
+                // 添加新增的节点
+                var destinationsToAdd = currentDestinations
+                    .Where(cd => !currentRingDestinations.Any(rd => rd.Code == cd.Code))
+                    .ToList();
+
+                foreach (var dest in destinationsToAdd)
+                {
+                    AddDestination(dest);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 从上下文中获取哈希键
+        /// </summary>
+        private string GetHashKeyFromContext(LoadBalanceContext context)
+        {
+            if (!string.IsNullOrEmpty(context.ClientIp))
+            {
+                return context.ClientIp;
+            }
+
+            // 如果连客户端IP都没有，使用请求路径
+            if (!string.IsNullOrEmpty(context.RequestPath))
+            {
+                return context.RequestPath;
+            }
+
+            // 最后回退到随机数
+            return Guid.NewGuid().ToString();
+        }
+
+        /// <summary>
+        /// 在哈希环中查找下一个节点
+        /// </summary>
+        private Destination FindNextNode(uint hash)
+        {
+            // 查找第一个键大于等于当前哈希的节点
+            foreach (var kvp in _ring)
+            {
+                if (kvp.Key >= hash)
+                {
+                    return kvp.Value;
+                }
+            }
+
+            // 如果没找到，回到环的开头（环状结构）
+            return _ring.First().Value;
         }
 
         private uint ComputeHash(string input)
