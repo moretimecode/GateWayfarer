@@ -436,3 +436,7 @@ $RECYCLE.BIN/
 /proto/pro/finance/descriptor.pb
 
 src/At.Locazy.Background.Host/Properties/launchSettings.json
+INTEGRATION_TESTS_SUMMARY.md
+final_test.txt
+test_output.txt
+TESTS_SUMMARY_FUNCTIONAL.md
