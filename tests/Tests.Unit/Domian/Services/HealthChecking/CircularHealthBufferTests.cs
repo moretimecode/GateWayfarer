@@ -1,6 +1,4 @@
-using Domain.Services;
 using Domain.Services.HealthChecking;
-using Xunit;
 
 namespace Tests.Unit.Domain.Services.HealthChecking;
 
