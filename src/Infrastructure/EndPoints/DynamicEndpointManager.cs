@@ -23,7 +23,7 @@ namespace Infrastructure.Endpoints
         private readonly ConcurrentDictionary<string, DynamicEndpointInfo> _endpointInfos;
 
         // 用于通知路由表变更
-        private readonly object _lock = new();
+        private readonly System.Threading.Lock _lock = new();
         private List<Endpoint> _endpoints;
         private IChangeToken? _changeToken;
         private CancellationTokenSource? _cancellationTokenSource;
@@ -72,7 +72,7 @@ namespace Infrastructure.Endpoints
                 }
 
                 // 创建RouteEndpoint
-                var endpoint =  CreateRouteEndpoint(routeConfig);
+                var endpoint = CreateRouteEndpoint(routeConfig);
                 if (endpoint == null)
                 {
                     return new EndpointOperationResult
@@ -133,7 +133,7 @@ namespace Infrastructure.Endpoints
         /// <summary>
         /// 更新现有Endpoint
         /// </summary>
-        public  EndpointOperationResult UpdateEndpoint(string routeName, RouteConfigItem newConfig)
+        public EndpointOperationResult UpdateEndpoint(string routeName, RouteConfigItem newConfig)
         {
             try
             {
@@ -151,14 +151,14 @@ namespace Infrastructure.Endpoints
                 }
 
                 // 先删除旧的
-                var removeResult =  RemoveEndpoint(routeName);
+                var removeResult = RemoveEndpoint(routeName);
                 if (!removeResult.Success)
                 {
                     return removeResult;
                 }
 
                 // 再添加新的
-                var addResult =  AddEndpoint(newConfig);
+                var addResult = AddEndpoint(newConfig);
                 if (addResult.Success)
                 {
                     _logger.LogInformation("✅ 成功更新动态Endpoint: {RouteName}", routeName);
@@ -182,7 +182,7 @@ namespace Infrastructure.Endpoints
         /// <summary>
         /// 删除Endpoint
         /// </summary>
-        public  EndpointOperationResult RemoveEndpoint(string routeName)
+        public EndpointOperationResult RemoveEndpoint(string routeName)
         {
             try
             {
@@ -230,7 +230,7 @@ namespace Infrastructure.Endpoints
         /// <summary>
         /// 清空所有动态Endpoint
         /// </summary>
-        public  EndpointOperationResult ClearAllEndpoints()
+        public EndpointOperationResult ClearAllEndpoints()
         {
             try
             {
@@ -268,7 +268,7 @@ namespace Infrastructure.Endpoints
         /// <summary>
         /// 获取所有Endpoint信息
         /// </summary>
-        public  List<DynamicEndpointInfo> GetAllEndpoints()
+        public List<DynamicEndpointInfo> GetAllEndpoints()
         {
             return [.. _endpointInfos.Values];
         }

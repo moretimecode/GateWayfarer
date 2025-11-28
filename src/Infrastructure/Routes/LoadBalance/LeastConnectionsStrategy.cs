@@ -8,8 +8,7 @@ namespace Infrastructure.Routes.LoadBalance
     public class LeastConnectionsStrategy : LoadBalanceStrategyBase
     {
         private static readonly Dictionary<string, int> _connectionCounts = new();
-        private static readonly object _lock = new();
-
+        private static readonly System.Threading.Lock _lock = new();
         public LeastConnectionsStrategy(ILogger<LeastConnectionsStrategy> logger) : base(logger)
         {
         }
@@ -22,14 +21,14 @@ namespace Infrastructure.Routes.LoadBalance
             {
                 var selected = destinations
                     .OrderBy(d => GetConnectionCount(d.Code))
-                    .ThenBy(d => d.Code) 
+                    .ThenBy(d => d.Code)
                     .First();
 
                 IncrementConnectionCount(selected.Code);
 
-                Logger.LogDebug("LeastConnections selected destination: {DestinationCode} (connections: {ConnectionCount})", 
+                Logger.LogDebug("LeastConnections selected destination: {DestinationCode} (connections: {ConnectionCount})",
                     selected.Code, GetConnectionCount(selected.Code));
-                
+
                 return selected;
             }
         }

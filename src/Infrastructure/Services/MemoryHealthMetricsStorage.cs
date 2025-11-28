@@ -55,13 +55,13 @@ namespace Infrastructure.Services
         public ReadOnlySpan<CompactHealthMetrics> GetRecentMetrics(string destinationCode, int count)
         {
             if (string.IsNullOrWhiteSpace(destinationCode) || count <= 0)
-                return Array.Empty<CompactHealthMetrics>();
+                return [];
 
             using (_rwLock.EnterRead())
             {
                 return _buffers.TryGetValue(destinationCode, out var buffer)
                     ? buffer.GetRecent(count)
-                    : Array.Empty<CompactHealthMetrics>();
+                    : [];
             }
         }
 

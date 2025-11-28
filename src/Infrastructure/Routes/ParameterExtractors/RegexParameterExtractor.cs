@@ -22,7 +22,7 @@ namespace Infrastructure.Routes.ParameterExtractors
                 {
                     foreach (string groupName in regex.GetGroupNames())
                     {
-                        if (groupName != "0") 
+                        if (groupName != "0")
                         {
                             var group = match.Groups[groupName];
                             if (group.Success)

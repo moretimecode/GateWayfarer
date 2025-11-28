@@ -74,7 +74,7 @@ namespace Domain.Services.HealthChecking
         {
             get
             {
-                return LatestCheckTimestampMs > 0 
+                return LatestCheckTimestampMs > 0
                     ? DateTimeOffset.FromUnixTimeMilliseconds(LatestCheckTimestampMs)
                     : null;
             }
@@ -123,47 +123,43 @@ namespace Domain.Services.HealthChecking
             int successCount = 0;
             int failureCount = 0;
             long totalResponseTime = 0;
-            int consecutiveFailures = 0;
-            int consecutiveSuccesses = 0;
             double maxResponseTime = 0;
             double minResponseTime = double.MaxValue;
 
             var latest = metrics[0];
-            bool countingFailures = true;
-            bool countingSuccesses = true;
 
             for (int i = 0; i < metrics.Length; i++)
             {
                 var metric = metrics[i];
-                if (metric.IsSuccessful)
-                {
-                    successCount++;
-                    if (countingSuccesses && !countingFailures)
-                    {
-                        consecutiveSuccesses++;
-                    }
-                    else
-                    {
-                        countingFailures = false;
-                    }
-                }
-                else
-                {
-                    failureCount++;
-                    if (countingFailures && !countingSuccesses)
-                    {
-                        consecutiveFailures++;
-                    }
-                    else
-                    {
-                        countingSuccesses = false;
-                    }
-                }
 
-                // 统计响应时间
+                if (metric.IsSuccessful)
+                    successCount++;
+                else
+                    failureCount++;
+
                 totalResponseTime += metric.ResponseTimeMs;
                 maxResponseTime = Math.Max(maxResponseTime, metric.ResponseTimeMs);
                 minResponseTime = Math.Min(minResponseTime, metric.ResponseTimeMs);
+            }
+
+            int consecutiveFailures = 0;
+            int consecutiveSuccesses = 0;
+
+            bool currentState = latest.IsSuccessful;
+
+            for (int i = 0; i < metrics.Length; i++)
+            {
+                if (metrics[i].IsSuccessful == currentState)
+                {
+                    if (currentState)
+                        consecutiveSuccesses++;
+                    else
+                        consecutiveFailures++;
+                }
+                else
+                {
+                    break;
+                }
             }
 
             return new HealthBufferStats
@@ -252,10 +248,10 @@ namespace Domain.Services.HealthChecking
         public override readonly int GetHashCode()
         {
             return HashCode.Combine(
-                TotalCount, 
-                SuccessCount, 
-                SuccessRate, 
-                AverageResponseTimeMs, 
+                TotalCount,
+                SuccessCount,
+                SuccessRate,
+                AverageResponseTimeMs,
                 LatestCheckTimestampMs,
                 LatestCheckSuccess);
         }

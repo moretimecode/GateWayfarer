@@ -17,9 +17,9 @@ namespace Infrastructure.Services.HealthPolicyCalculators
             {
                 return HealthStatus.CreateUnknown("No metrics data");
             }
-            
+
             var latest = metrics[0];
-            
+
             if (latest.IsSuccessful)
             {
                 return HealthStatus.CreateHealthy(1.0, latest.ResponseTimeMs);

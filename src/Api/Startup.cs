@@ -18,7 +18,6 @@ namespace Api
         public IWebHostEnvironment HostingEnvironment { get; } = hostingEnvironment;
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddHttpClient();
             services.AddApplicationLayer(Configuration);
             services.AddInfrastructure(Configuration);
             services.AddAppConfiguration<MyAppConfiguration>(Configuration);

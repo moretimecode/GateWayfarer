@@ -17,19 +17,19 @@ namespace Infrastructure.Routes.LoadBalance
         {
             var totalWeight = CalculateTotalWeight(destinations);
             var randomWeight = GetRandomInt(totalWeight);
-            
+
             var currentWeight = 0;
             foreach (var destination in destinations)
             {
                 currentWeight += destination.Weight;
-                if (randomWeight < currentWeight)
+                if (randomWeight <= currentWeight)
                 {
-                    Logger.LogDebug("WeightedRoundRobin selected destination: {DestinationCode} (weight: {Weight})", 
+                    Logger.LogDebug("WeightedRoundRobin selected destination: {DestinationCode} (weight: {Weight})",
                         destination.Code, destination.Weight);
                     return destination;
                 }
             }
-            
+
             return destinations.First();
         }
     }

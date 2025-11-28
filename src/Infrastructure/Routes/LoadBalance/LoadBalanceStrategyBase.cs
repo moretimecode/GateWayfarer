@@ -21,8 +21,12 @@ namespace Infrastructure.Routes.LoadBalance
 
         public virtual Destination SelectDestination(List<Destination> destinations, LoadBalanceContext context)
         {
+            if (destinations is null)
+            {
+                throw new NullReferenceException();
+            }
             // 基础验证
-            if (!destinations.Any())
+            if (destinations.Count == 0)
             {
                 throw new InvalidOperationException("No destinations available for load balancing");
             }

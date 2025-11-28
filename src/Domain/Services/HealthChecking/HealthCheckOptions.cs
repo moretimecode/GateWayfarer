@@ -67,12 +67,12 @@ namespace Domain.Services.HealthChecking
         /// 动态调整（根据成功率调整）
         /// </summary>
         Dynamic,
-        
+
         /// <summary>
         /// 根据实例数静态计算
         /// </summary>
         Static,
-        
+
         /// <summary>
         /// 使用系统默认线程池
         /// </summary>

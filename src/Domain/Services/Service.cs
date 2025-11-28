@@ -159,6 +159,10 @@ namespace Domain.Services
         /// </summary>
         public List<Destination> GetHealthyDestinations(IHealthCalculationService healthService)
         {
+            if (healthService is null)
+            {
+                throw new ArgumentNullException();
+            }
             if (!_destinations.Any())
                 return [];
 
