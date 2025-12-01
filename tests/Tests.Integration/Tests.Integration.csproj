@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,6 +23,19 @@
   <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
+  
+  <!-- 编译项目中的所有测试文件 -->
+  <ItemGroup>
+    <!-- P0 级核心功能测试 -->
+    <Compile Include="P0_CoreFunctionality\*.cs" />
+    <!-- P1 级高级功能测试 -->
+    <Compile Include="P1_Advanced\*.cs" />
+    <!-- 测试基础设施 -->
+    <Compile Include="Fixtures\*.cs" />
+    <!-- 根目录测试 (如有) -->
+    <Compile Include="*.cs" Exclude="bin\**;obj\**" />
+  </ItemGroup>
+  
   <ItemGroup>   
     <ProjectReference Include="..\..\src\Domain\Domain.csproj" />
      <ProjectReference Include="..\..\src\Api\Api.csproj" />
