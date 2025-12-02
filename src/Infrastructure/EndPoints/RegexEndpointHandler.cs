@@ -202,7 +202,7 @@ namespace Infrastructure.Endpoints
                     path = context.Request.Path.Value,
                     method = context.Request.Method,
                     serviceCode = routeMatchResult.Route.ServiceCode,
-                    destination = routeMatchResult.SelectedDestination.GetAddress(),
+                    destination = routeMatchResult.SelectedDestination?.GetAddress() ?? "",
                     regexParameters = context.Items["RegexParameters"],
                     timestamp = DateTime.UtcNow
                 };

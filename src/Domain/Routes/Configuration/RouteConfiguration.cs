@@ -52,5 +52,20 @@ public class RouteConfigItem
     /// 负载均衡类型
     /// </summary>
     public LoadBalanceType LoadBalanceType { get; set; } = LoadBalanceType.RoundRobin;
+
+    /// <summary>
+    /// 授权策略名称
+    /// 指定此路由使用哪个认证授权策略
+    /// 例如："public", "authenticated", "admin"
+    /// 默认使用 "public" （任何人都可以访问）
+    /// 
+    /// 参考YARP的做法，在appsettings.json中配置
+    /// </summary>
+    public string? AuthorizationPolicy { get; set; } = "public";
+
+    /// <summary>
+    /// 是否允许匿名访问（覆盖策略中的认证要求）
+    /// </summary>
+    public bool AllowAnonymous { get; set; } = false;
 }
 

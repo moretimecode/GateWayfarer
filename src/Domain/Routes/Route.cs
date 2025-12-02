@@ -49,12 +49,28 @@ public class Route : AggregateRoot
     public RequestBatchingConfig BatchingConfig { get; private set; }
     public RequestForwardingConfig ForwardingConfig { get; private set; }
 
+    /// <summary>
+    /// 授权策略名称
+    /// 指定此路由使用哪个认证授权策略
+    /// 例如："public", "authenticated", "admin"
+    /// 默认使用 "public" （任何人都可以访问）
+    /// </summary>
+    public string? AuthorizationPolicy { get; private set; }
+
+    /// <summary>
+    /// 是否允许匿名访问
+    /// 如果为true，则忽略AuthorizationPolicy的认证要求
+    /// </summary>
+    public bool AllowAnonymous { get; private set; }
+
 
     private Route()
     {
         Name = string.Empty;
         Path = string.Empty;
         ServiceCode = string.Empty;
+        AuthorizationPolicy = "public";
+        AllowAnonymous = false;
     }
 
     public Route(
@@ -65,7 +81,9 @@ public class Route : AggregateRoot
         int priority = 0,
         bool isEnabled = true,
         RouteMatchType matchType = RouteMatchType.Prefix,
-        LoadBalanceType loadBalanceType = LoadBalanceType.RoundRobin)
+        LoadBalanceType loadBalanceType = LoadBalanceType.RoundRobin,
+        string? authorizationPolicy = "public",
+        bool allowAnonymous = false)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Route name cannot be empty", nameof(name));
@@ -84,6 +102,8 @@ public class Route : AggregateRoot
         IsEnabled = isEnabled;
         MatchType = matchType;
         LoadBalanceType = loadBalanceType;
+        AuthorizationPolicy = authorizationPolicy ?? "public";
+        AllowAnonymous = allowAnonymous;
     }
 
     /// <summary>
@@ -141,7 +161,9 @@ public class Route : AggregateRoot
         int? priority = null,
         bool? isEnabled = null,
         RouteMatchType? matchType = null,
-        LoadBalanceType? loadBalanceType = null)
+        LoadBalanceType? loadBalanceType = null,
+        string? authorizationPolicy = null,
+        bool? allowAnonymous = null)
     {
         if (!string.IsNullOrWhiteSpace(name))
             Name = name;
@@ -166,6 +188,12 @@ public class Route : AggregateRoot
 
         if (loadBalanceType.HasValue)
             LoadBalanceType = loadBalanceType.Value;
+
+        if (!string.IsNullOrWhiteSpace(authorizationPolicy))
+            AuthorizationPolicy = authorizationPolicy;
+
+        if (allowAnonymous.HasValue)
+            AllowAnonymous = allowAnonymous.Value;
     }
 
     /// <summary>

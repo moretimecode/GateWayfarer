@@ -1,5 +1,5 @@
-﻿using Api.Swaggers;
-using Api.Middleware;
+﻿using Api.Middleware;
+using Api.Swaggers;
 using Application;
 using Droplet.AppConfiguration;
 using Droplet.AspNetCore.Filters;
@@ -108,10 +108,10 @@ namespace Api
                 options.SwaggerEndpoint("/swagger/ca/swagger.json", "getWay CA Api");
                 options.SwaggerEndpoint("/swagger/background/swagger.json", "getWay  BackGround Api");
             });
-            
+
             // 暴露 Prometheus 指标端点
             app.UseOpenTelemetryPrometheusScrapingEndpoint();
-            
+
             app.UseRouting();
 
             app.UseEndpoints(endpoints =>

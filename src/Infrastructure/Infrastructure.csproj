@@ -21,19 +21,23 @@
 		</PackageReference>
 		<PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="9.0.0" />
 
-			  <!-- OpenTelemetry 核心包 -->
-	  <PackageReference Include="OpenTelemetry" Version="1.14.0" />
-	  <PackageReference Include="OpenTelemetry.Api" Version="1.14.0" />
-	  <PackageReference Include="OpenTelemetry.Exporter.Jaeger" Version="1.5.1" />
-	<PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.14.0-beta.1" />
-	  
-	  <!-- OpenTelemetry 自动采集 -->
-	  <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.10.1" />
-	  <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.9.1" />
-	  <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.14.0" />
-	 <PackageReference Include="OpenTelemetry.Instrumentation.Process" Version="1.14.0-beta.2" />
-<PackageReference Include="OpenTelemetry.Instrumentation.SqlClient" Version="1.14.0-beta.1" />
-<PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.14.0-beta.2" />
+		<!-- JWT认证 -->
+		<PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.2.1" />
+		<PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.2.1" />
+
+		<!-- OpenTelemetry 核心包 -->
+		<PackageReference Include="OpenTelemetry" Version="1.14.0" />
+		<PackageReference Include="OpenTelemetry.Api" Version="1.14.0" />
+		<PackageReference Include="OpenTelemetry.Exporter.Jaeger" Version="1.5.1" />
+		<PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.14.0-beta.1" />
+		
+		<!-- OpenTelemetry 自动采集 -->
+		<PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.10.1" />
+		<PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.9.1" />
+		<PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.14.0" />
+		<PackageReference Include="OpenTelemetry.Instrumentation.Process" Version="1.14.0-beta.2" />
+		<PackageReference Include="OpenTelemetry.Instrumentation.SqlClient" Version="1.14.0-beta.1" />
+		<PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.14.0-beta.2" />
 	</ItemGroup>
 
 	<PropertyGroup>

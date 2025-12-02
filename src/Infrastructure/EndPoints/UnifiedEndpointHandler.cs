@@ -7,6 +7,9 @@ using Infrastructure.Protocol.Streaming;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Domain.Authentication;
+using Domain.Services;
+using System.Security.Claims;
 
 namespace Infrastructure.Endpoints
 {
@@ -50,7 +53,35 @@ namespace Infrastructure.Endpoints
                 context.Items["RouteName"] = routeConfig.Name;
                 context.Items["ServiceCode"] = routeConfig.ServiceCode;
 
-                // ========== 新增：转发逻辑 ==========
+                // 🔐 认证和授权检查
+                var authResult = await PerformAuthenticationAsync(context);
+                if (!authResult.IsAuthenticated && !routeConfig.AllowAnonymous)
+                {
+                    var authOptions = _serviceProvider.GetRequiredService<AuthenticationOptions>();
+                    var policy = authOptions.Policies.GetValueOrDefault(routeConfig.AuthorizationPolicy ?? authOptions.DefaultAuthorizationPolicy);
+
+                    if (policy?.RequireAuthentication == true)
+                    {
+                        context.Response.StatusCode = 401;
+                        context.Response.ContentType = "application/json";
+                        await context.Response.WriteAsync("{\"error\":\"Unauthorized\",\"message\":\"Authentication is required\"}");
+                        return;
+                    }
+                }
+
+                if (authResult.IsAuthenticated && !routeConfig.AllowAnonymous && authResult.Principal != null)
+                {
+                    var authzResult = await PerformAuthorizationAsync(context, authResult.Principal, routeConfig);
+                    if (!authzResult.IsAuthorized)
+                    {
+                        context.Response.StatusCode = 403;
+                        context.Response.ContentType = "application/json";
+                        await context.Response.WriteAsync($"{{\"error\":\"Forbidden\",\"message\":\"{authzResult.FailureReason}\"}}");
+                        return;
+                    }
+                }
+
+                // ========== 转发逻辑 ==========
                 await ForwardRequestAsync(context, routeConfig);
 
                 _logger.LogInformation("✅ 成功处理请求: {RouteName}", routeConfig.Name);
@@ -220,6 +251,99 @@ namespace Infrastructure.Endpoints
                 "OPTIONS" => allowedMethods.HasFlag(Domain.Routes.HttpMethod.OPTIONS),
                 _ => false
             };
+        }
+
+        /// <summary>
+        /// 执行认证
+        /// </summary>
+        private async Task<Domain.Authentication.AuthenticationResult> PerformAuthenticationAsync(HttpContext context)
+        {
+            try
+            {
+                var authService = _serviceProvider.GetRequiredService<IAuthenticationService>();
+                var authOptions = _serviceProvider.GetRequiredService<AuthenticationOptions>();
+
+                // 从Authorization Header提取Token
+                var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+                if (string.IsNullOrWhiteSpace(authHeader))
+                {
+                    _logger.LogDebug("⚠️ 未提供Authorization Header");
+                    return Domain.Authentication.AuthenticationResult.Failure("No token provided");
+                }
+
+                // 提取Token
+                var token = authService.ExtractToken(authHeader);
+                if (string.IsNullOrWhiteSpace(token))
+                {
+                    _logger.LogWarning("❌ 无法从Authorization Header提取Token");
+                    return Domain.Authentication.AuthenticationResult.Failure("Invalid token format");
+                }
+
+                // 验证Token
+                var result = await authService.VerifyTokenAsync(token);
+                if (result.IsAuthenticated && result.Principal != null)
+                {
+                    // 将Principal设置到HttpContext
+                    context.User = result.Principal;
+                    _logger.LogInformation("✅ 用户认证成功: {UserId}",
+                        result.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown");
+                }
+                else
+                {
+                    _logger.LogWarning("❌ Token验证失败: {Reason}", result.FailureReason);
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ 认证过程发生异常");
+                return Domain.Authentication.AuthenticationResult.Failure($"Authentication error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 执行授权
+        /// </summary>
+        private async Task<Domain.Authentication.AuthorizationResult> PerformAuthorizationAsync(
+            HttpContext context, ClaimsPrincipal user, RouteConfigItem routeConfig)
+        {
+            try
+            {
+                var authzService = _serviceProvider.GetRequiredService<IAuthorizationService>();
+                var authOptions = _serviceProvider.GetRequiredService<AuthenticationOptions>();
+
+                // 获取路由的授权策略
+                var policyName = routeConfig.AuthorizationPolicy ?? authOptions.DefaultAuthorizationPolicy;
+                var policy = authOptions.Policies.GetValueOrDefault(policyName);
+
+                if (policy == null)
+                {
+                    _logger.LogWarning("⚠️ 未找到策略: {PolicyName}", policyName);
+                    policy = authOptions.Policies.GetValueOrDefault(authOptions.DefaultAuthorizationPolicy);
+                }
+
+                // 执行授权检查
+                var result = await authzService.CheckAuthorizationAsync(user, policy);
+
+                if (result.IsAuthorized)
+                {
+                    _logger.LogInformation("✅ 授权检查通过: 路由 {RouteName} | 策略 {PolicyName}",
+                        routeConfig.Name, policyName);
+                }
+                else
+                {
+                    _logger.LogWarning("❌ 授权检查失败: {Reason} | 路由 {RouteName} | 策略 {PolicyName}",
+                        result.FailureReason, routeConfig.Name, policyName);
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ 授权过程发生异常");
+                return Domain.Authentication.AuthorizationResult.Failure($"Authorization error: {ex.Message}");
+            }
         }
     }
 }
