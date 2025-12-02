@@ -3,7 +3,6 @@ using Domain.Routes.Configuration;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.Routing.Patterns;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
 using System.Collections.Concurrent;
@@ -17,6 +16,7 @@ namespace Infrastructure.Endpoints
     public class DynamicEndpointManager : EndpointDataSource, IDynamicEndpointManager
     {
         private readonly ILogger<DynamicEndpointManager> _logger;
+        private readonly RouteProxyRequestHandler _proxyRequestHandler;
 
         // 存储动态创建的Endpoint
         private readonly ConcurrentDictionary<string, RouteEndpoint> _dynamicEndpoints;
@@ -40,9 +40,11 @@ namespace Infrastructure.Endpoints
         }
 
         public DynamicEndpointManager(
-            ILogger<DynamicEndpointManager> logger)
+            ILogger<DynamicEndpointManager> logger,
+            RouteProxyRequestHandler proxyRequestHandler)
         {
             _logger = logger;
+            _proxyRequestHandler = proxyRequestHandler;
 
             _dynamicEndpoints = new ConcurrentDictionary<string, RouteEndpoint>();
             _endpointInfos = new ConcurrentDictionary<string, DynamicEndpointInfo>();
@@ -344,36 +346,18 @@ namespace Infrastructure.Endpoints
 
         /// <summary>
         /// 创建请求委托
+        /// 使用注入的 RouteProxyRequestHandler 处理路径转换（类似 YARP 的 Transform）
         /// </summary>
         private RequestDelegate CreateRequestDelegate(RouteConfigItem routeConfig)
         {
-            return async (HttpContext context) =>
-    {
-        try
-        {
-            // 🔥 使用工厂模式选择处理器（推荐）
-            var handlerFactory = context.RequestServices.GetRequiredService<IEndpointHandlerFactory>();
-            var handler = handlerFactory.CreateHandler(routeConfig);
-
-            context.Items["RouteConfig"] = routeConfig;
-            context.Items["RouteName"] = routeConfig.Name;
-
-            // 执行处理
-            await handler.HandleAsync(context, routeConfig);
-        }
-        catch (Exception ex)
-        {
-            var logger = context.RequestServices.GetRequiredService<ILogger<DynamicEndpointManager>>();
-            logger.LogError(ex, "处理动态路由请求失败: {RouteName}, Path: {Path}",
-                routeConfig.Name, context.Request.Path);
-
-            if (!context.Response.HasStarted)
+            // 根据匹配类型选择不同的处理策略
+            return routeConfig.MatchType switch
             {
-                context.Response.StatusCode = 500;
-                await context.Response.WriteAsync("Internal Server Error");
-            }
-        }
-    };
+                RouteMatchType.Exact => _proxyRequestHandler.CreateExactMatchDelegate(routeConfig),
+                RouteMatchType.Prefix => _proxyRequestHandler.CreatePrefixMatchDelegate(routeConfig),
+                RouteMatchType.Regex => _proxyRequestHandler.CreateRequestDelegate(routeConfig),
+                _ => _proxyRequestHandler.CreateRequestDelegate(routeConfig)
+            };
         }
 
         /// <summary>

@@ -6,9 +6,10 @@ namespace Infrastructure.EndPoints;
 public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddEndpointServices(this IServiceCollection services)
-    { 
+    {
         services.AddSingleton<RegexMatcher>();
 
+        services.AddSingleton<RouteProxyRequestHandler>();
         services.AddSingleton<RouteToEndpointMapper>();
         services.AddSingleton<DynamicEndpointManager>();
         services.AddSingleton<IDynamicEndpointManager>(provider => provider.GetRequiredService<DynamicEndpointManager>());

@@ -9,6 +9,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Domain.Authentication;
 using Domain.Services;
+using Domain.Services.Services;
+using Infrastructure.Routes;
 using System.Security.Claims;
 
 namespace Infrastructure.Endpoints
@@ -103,30 +105,55 @@ namespace Infrastructure.Endpoints
         /// </summary>
         private async Task ForwardRequestAsync(Microsoft.AspNetCore.Http.HttpContext context, RouteConfigItem routeConfig)
         {
-            // 1. 获取路由匹配服务（负责负载均衡和健康检查）
-            var routeMatchingService = _serviceProvider.GetRequiredService<IRouteMatchingService>();
-            var gatewayRequest = context.FromHttpContext();
-            var routeMatchResult = await routeMatchingService.MatchAsync(gatewayRequest);
+            // 路由已找到，ServiceCode 已知 → 直接选择目标并转发
+            var serviceRepository = _serviceProvider.GetRequiredService<IServiceRepository>();
+            var healthCalcService = _serviceProvider.GetRequiredService<IHealthCalculationService>();
+            var service = await serviceRepository.GetByCodeAsync(routeConfig.ServiceCode);
 
-            if (routeMatchResult == null)
+            if (service == null)
             {
                 context.Response.StatusCode = 503;
-                await context.Response.WriteAsync("No available destination");
+                await context.Response.WriteAsync("Service not found");
                 return;
             }
 
-            // 2. 判断是否需要流式转发
+            var healthyDests = service.GetHealthyDestinations(healthCalcService);
+            if (!healthyDests.Any())
+            {
+                context.Response.StatusCode = 503;
+                await context.Response.WriteAsync("No healthy destinations");
+                return;
+            }
+
+            // 负载均衡选择目标
+            var strategy = _serviceProvider.GetKeyedService<ILoadBalanceStrategy>(routeConfig.LoadBalanceType);
+            var selectedDest = strategy?.SelectDestination(healthyDests, new LoadBalanceContext
+            {
+                RequestPath = context.Request.Path,
+                RequestId = context.TraceIdentifier,
+                ClientIp = context.Connection.RemoteIpAddress?.ToString() ?? "",
+                Metadata = new Dictionary<string, object>()
+            }) ?? healthyDests.First();
+
+            // 构建最小化的 RouteMatchResult 用于转发
+            // 注：转发器主要用 SelectedDestination，Route.Name 用于日志
+            var result = new RouteMatchResult
+            {
+                SelectedDestination = selectedDest,
+                Parameters = new RouteParameters(),
+                Route = Domain.Routes.Route.CreateMinimalRoute(routeConfig.Name)
+            };
+
+            // 转发
             var streamingForwarder = _serviceProvider.GetService<IStreamingForwarder>();
 
             if (streamingForwarder != null && streamingForwarder.ShouldUseStreaming(context))
             {
-                // 使用流式转发
-                await ForwardWithStreamingAsync(context, routeMatchResult, streamingForwarder);
+                await ForwardWithStreamingAsync(context, result, streamingForwarder);
             }
             else
             {
-                // 使用标准协议转发
-                await ForwardWithProtocolAsync(context, routeMatchResult);
+                await ForwardWithProtocolAsync(context, result);
             }
         }
 

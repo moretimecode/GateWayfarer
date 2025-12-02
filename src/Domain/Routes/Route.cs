@@ -234,4 +234,24 @@ public class Route : AggregateRoot
         if (ForwardingConfig is null)
             ForwardingConfig = RequestForwardingConfig.Default();
     }
+
+    /// <summary>
+    /// 创建最小化的Route对象用于转发
+    /// 仅包含必要的信息（名称），其他字段使用默认值
+    /// </summary>
+    public static Route CreateMinimalRoute(string routeName)
+    {
+        return new Route(
+            name: routeName,
+            path: string.Empty,
+            serviceCode: string.Empty,
+            httpMethods: HttpMethod.GET,
+            priority: 0,
+            isEnabled: true,
+            matchType: RouteMatchType.Exact,
+            loadBalanceType: LoadBalanceType.Random,
+            authorizationPolicy: null,
+            allowAnonymous: true
+        );
+    }
 }

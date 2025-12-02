@@ -7,6 +7,9 @@ using Infrastructure.Protocol.Streaming;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Domain.Services;
+using Domain.Services.Services;
+using Infrastructure.Routes;
 
 namespace Infrastructure.Endpoints
 {
@@ -92,44 +95,61 @@ namespace Infrastructure.Endpoints
             RouteConfigItem routeConfig,
             RegexMatchResult matchResult)
         {
-            // 1. 获取路由匹配服务（负责负载均衡和健康检查）
-            var routeMatchingService = _serviceProvider.GetRequiredService<IRouteMatchingService>();
+            // 路由已找到，ServiceCode 已知 → 直接选择目标并转发
+            var serviceRepository = _serviceProvider.GetRequiredService<IServiceRepository>();
+            var healthCalcService = _serviceProvider.GetRequiredService<IHealthCalculationService>();
+            var service = await serviceRepository.GetByCodeAsync(routeConfig.ServiceCode);
 
-            // 2. 创建 GatewayRequest（使用扩展方法）
-            var gatewayRequest = context.FromHttpContext();
-
-            // 3. 将正则捕获的参数添加到 GatewayRequest（重要！）
-            if (matchResult.Parameters != null)
+            if (service == null)
             {
-                foreach (var param in matchResult.Parameters)
-                {
-                    gatewayRequest.WithRouteParameter(param.Key, param.Value);
-                }
-            }
-
-            // 4. 路由匹配
-            var routeMatchResult = await routeMatchingService.MatchAsync(gatewayRequest);
-
-            if (routeMatchResult == null)
-            {
-                _logger.LogWarning("未找到可用的目标服务: Route={RouteName}", routeConfig.Name);
                 context.Response.StatusCode = 503;
-                await context.Response.WriteAsync("No available destination");
+                await context.Response.WriteAsync("Service not found");
                 return;
             }
 
-            // 5. 判断是否需要流式转发
-            var streamingForwarder = _serviceProvider.GetService<IStreamingForwarder>();
+            var healthyDests = service.GetHealthyDestinations(healthCalcService);
+            if (!healthyDests.Any())
+            {
+                context.Response.StatusCode = 503;
+                await context.Response.WriteAsync("No healthy destinations");
+                return;
+            }
 
+            // 负载均衡选择目标
+            var strategy = _serviceProvider.GetKeyedService<ILoadBalanceStrategy>(routeConfig.LoadBalanceType);
+            var lbMetadata = new Dictionary<string, object>();
+            if (matchResult.Parameters != null)
+            {
+                foreach (var p in matchResult.Parameters)
+                    lbMetadata[p.Key] = p.Value;
+            }
+
+            var selectedDest = strategy?.SelectDestination(healthyDests, new LoadBalanceContext
+            {
+                RequestPath = context.Request.Path,
+                RequestId = context.TraceIdentifier,
+                ClientIp = context.Connection.RemoteIpAddress?.ToString() ?? "",
+                Metadata = lbMetadata
+            }) ?? healthyDests.First();
+
+            // 构建最小化的 RouteMatchResult 用于转发
+            // 注：转发器主要用 SelectedDestination，Route.Name 用于日志
+            var result = new RouteMatchResult
+            {
+                SelectedDestination = selectedDest,
+                Parameters = new RouteParameters(),
+                Route = Domain.Routes.Route.CreateMinimalRoute(routeConfig.Name)
+            };
+
+            // 转发
+            var streamingForwarder = _serviceProvider.GetService<IStreamingForwarder>();
             if (streamingForwarder != null && streamingForwarder.ShouldUseStreaming(context))
             {
-                // 使用流式转发
-                await ForwardWithStreamingAsync(context, routeMatchResult, streamingForwarder);
+                await ForwardWithStreamingAsync(context, result, streamingForwarder);
             }
             else
             {
-                // 使用标准协议转发
-                await ForwardWithProtocolAsync(context, routeMatchResult);
+                await ForwardWithProtocolAsync(context, result);
             }
         }
 
