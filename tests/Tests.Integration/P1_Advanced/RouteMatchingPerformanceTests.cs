@@ -49,7 +49,7 @@ public class RouteMatchingPerformanceTests : IAsyncLifetime
     public async Task Should_Match_Routes_Efficiently_With_Large_Count()
     {
         // Arrange
-        const int routeCount = 100;
+        const int routeCount = 1000;
         for (int i = 0; i < routeCount; i++)
         {
             var route = new Route(

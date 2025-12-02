@@ -1,9 +1,11 @@
 ﻿using Api.Swaggers;
+using Api.Middleware;
 using Application;
 using Droplet.AppConfiguration;
 using Droplet.AspNetCore.Filters;
 using Infrastructure;
 using Infrastructure.Endpoints;
+using Infrastructure.OpenTelemetry;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.OpenApi.Models;
 using Shared;
@@ -97,12 +99,19 @@ namespace Api
                 app.UseDeveloperExceptionPage();
             }
 
+            // 添加 OpenTelemetry 中间件（在其他中间件之前）
+            app.UseOpenTelemetryMiddleware();
+
             app.UseSwagger();
             app.UseSwaggerUI(options =>
             {
                 options.SwaggerEndpoint("/swagger/ca/swagger.json", "getWay CA Api");
                 options.SwaggerEndpoint("/swagger/background/swagger.json", "getWay  BackGround Api");
             });
+            
+            // 暴露 Prometheus 指标端点
+            app.UseOpenTelemetryPrometheusScrapingEndpoint();
+            
             app.UseRouting();
 
             app.UseEndpoints(endpoints =>

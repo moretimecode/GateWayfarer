@@ -1,8 +1,10 @@
 using Api;
 using Infrastructure.DB;
 using Infrastructure.Routes;
+using Infrastructure.OpenTelemetry;
 using Microsoft.EntityFrameworkCore;
 using NLog.Extensions.Logging;
+using OpenTelemetry.Exporter;
 using Route = Domain.Routes.Route;
 using Domain.Routes.Configuration;
 using Domain.Services;
@@ -56,6 +58,12 @@ public class Program
             services.Configure<ApiGatewayOptions>(context.Configuration.GetSection(ApiGatewayOptions.SectionName));
             services.Configure<Domain.Routes.Configuration.RouteOptions>(context.Configuration.GetSection(Domain.Routes.Configuration.RouteOptions.SectionName));
             services.Configure<ServiceOptions>(context.Configuration.GetSection(ServiceOptions.SectionName));
+
+            // 添加 OpenTelemetry 链路追踪和指标采集
+            services.ConfigureOpenTelemetry(context.Configuration);
+
+            // 注册网关性能指标单例
+            services.AddSingleton<GatewayMetrics>();
         })
         .ConfigureLogging((context, logging) =>
         {

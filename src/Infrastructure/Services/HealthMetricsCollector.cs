@@ -41,7 +41,7 @@ namespace Infrastructure.Services
             _logger = logger;
 
             InitializeConcurrencyLimit();
-            
+
             _options.OnChange((_) => UpdateConcurrencyLimit());
         }
 
@@ -58,7 +58,7 @@ namespace Infrastructure.Services
 
             _timer = new PeriodicTimer(options.Interval);
 
-            _logger.LogInformation("健康检查收集器启动，间隔: {Interval}, 超时: {Timeout}, 策略: {Strategy}", 
+            _logger.LogInformation("健康检查收集器启动，间隔: {Interval}, 超时: {Timeout}, 策略: {Strategy}",
                 options.Interval, options.Timeout, options.ThreadPoolStrategy);
 
             await RefreshDestinationsAsync();
@@ -88,7 +88,7 @@ namespace Infrastructure.Services
         {
             var startTime = DateTimeOffset.UtcNow;
             var destinations = _currentDestinations;
-            
+
             if (destinations.Count == 0)
             {
                 _logger.LogDebug("没有可用的destination，跳过本次收集");
@@ -125,7 +125,7 @@ namespace Infrastructure.Services
         private async Task CollectSingleMetricAsync(string destinationCode, Destination destination, CancellationToken cancellationToken)
         {
             var stopwatch = Stopwatch.StartNew();
-            
+
             await _concurrencyLimit.WaitAsync(cancellationToken);
             try
             {
@@ -140,7 +140,7 @@ namespace Infrastructure.Services
                 stopwatch.Stop();
                 RecordSuccess(stopwatch.Elapsed);
 
-                _logger.LogTrace("destination {Code} 健康检查完成: {Status}, 耗时: {Elapsed}ms", 
+                _logger.LogTrace("destination {Code} 健康检查完成: {Status}, 耗时: {Elapsed}ms",
                     destinationCode, metrics.Flags, stopwatch.ElapsedMilliseconds);
             }
             catch (Exception ex)
@@ -148,7 +148,7 @@ namespace Infrastructure.Services
                 stopwatch.Stop();
                 RecordFailure(stopwatch.Elapsed);
 
-                _logger.LogWarning(ex, "destination {Code} 健康检查失败，耗时: {Elapsed}ms", 
+                _logger.LogWarning(ex, "destination {Code} 健康检查失败，耗时: {Elapsed}ms",
                     destinationCode, stopwatch.ElapsedMilliseconds);
 
                 var failedMetrics = CreateFailedMetrics(ex);
@@ -176,14 +176,14 @@ namespace Infrastructure.Services
             {
                 var healthCheckUrl = destination.GetHealthCheckUrl(options.DefaultPath);
 
-            using var httpClient = CreateHttpClient(destination, options);
+                using var httpClient = CreateHttpClient(destination, options);
                 var response = await httpClient.GetAsync(healthCheckUrl, cancellationToken);
                 var elapsed = DateTimeOffset.UtcNow - startTime;
 
-                var flags = response.IsSuccessStatusCode 
-                    ? HealthCheckFlags.IsSuccessful 
-                    : (response.StatusCode >= System.Net.HttpStatusCode.InternalServerError 
-                        ? HealthCheckFlags.IsServerError 
+                var flags = response.IsSuccessStatusCode
+                    ? HealthCheckFlags.IsSuccessful
+                    : (response.StatusCode >= System.Net.HttpStatusCode.InternalServerError
+                        ? HealthCheckFlags.IsServerError
                         : HealthCheckFlags.IsClientError);
 
                 return new CompactHealthMetrics
@@ -246,7 +246,7 @@ namespace Infrastructure.Services
             return new CompactHealthMetrics
             {
                 TimestampMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                ResponseTimeMs = ushort.MaxValue, 
+                ResponseTimeMs = ushort.MaxValue,
                 StatusCode = 0,
                 Flags = flags
             };
@@ -259,7 +259,7 @@ namespace Infrastructure.Services
         {
             var concurrency = CalculateOptimalConcurrency(0);
             _concurrencyLimit = new SemaphoreSlim(concurrency, concurrency);
-            
+
             lock (_statsLock)
             {
                 _stats.CurrentConcurrency = concurrency;
@@ -283,7 +283,7 @@ namespace Infrastructure.Services
                 _stats.CurrentConcurrency = newConcurrency;
             }
 
-            _logger.LogInformation("并发限制已更新: {OldLimit} -> {NewLimit} (总destination: {Total})", 
+            _logger.LogInformation("并发限制已更新: {OldLimit} -> {NewLimit} (总destination: {Total})",
                 oldLimit?.CurrentCount ?? 0, newConcurrency, destinationCount);
         }
 
@@ -314,10 +314,10 @@ namespace Infrastructure.Services
         {
             return destinationCount switch
             {
-                <= 10 => destinationCount,          
-                <= 50 => destinationCount / 2,       
-                <= 200 => destinationCount / 5,    
-                _ => 40                              
+                <= 10 => destinationCount,
+                <= 50 => destinationCount / 2,
+                <= 200 => destinationCount / 5,
+                _ => 40
             };
         }
 
@@ -327,9 +327,9 @@ namespace Infrastructure.Services
         private int CalculateDynamicConcurrency(int destinationCount)
         {
             var baseConcurrency = CalculateStaticConcurrency(destinationCount);
-            
+
             var stats = GetStats();
-            if (stats.TotalCollections > 100) 
+            if (stats.TotalCollections > 100)
             {
                 if (stats.SuccessRate > 0.95)
                 {
@@ -337,7 +337,7 @@ namespace Infrastructure.Services
                 }
                 else if (stats.SuccessRate < 0.8)
                 {
-                    baseConcurrency = (int)(baseConcurrency * 0.8); 
+                    baseConcurrency = (int)(baseConcurrency * 0.8);
                 }
             }
 
@@ -432,7 +432,7 @@ namespace Infrastructure.Services
         private void UpdateAverageTime(double elapsedMs)
         {
             _recentCollectionTimes.Enqueue(elapsedMs);
-            
+
             while (_recentCollectionTimes.Count > 100)
             {
                 _recentCollectionTimes.TryDequeue(out _);
