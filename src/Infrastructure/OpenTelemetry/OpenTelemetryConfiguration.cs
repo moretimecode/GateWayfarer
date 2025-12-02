@@ -79,7 +79,18 @@ namespace Infrastructure.OpenTelemetry
                                 })
                                 .AddSource("Gateway.Routes", "Gateway.Services", "Gateway.Protocol", "Gateway.HealthCheck");
 
-                            if (otelConfig.JaegerEnabled)
+                            if (otelConfig.SigNozEnabled)
+                            {
+                                // SigNoz 通过 OTel Collector 支持 Jaeger 导出
+                                // 配置 Jaeger 导出到 SigNoz 的 OTel Collector
+                                tracing.AddJaegerExporter(opts =>
+                                {
+                                    opts.AgentHost = otelConfig.JaegerHost ?? "localhost";
+                                    opts.AgentPort = otelConfig.JaegerPort;
+                                    opts.MaxPayloadSizeInBytes = 4096;
+                                });
+                            }
+                            else if (otelConfig.JaegerEnabled)
                             {
                                 tracing.AddJaegerExporter(opts =>
                                 {
@@ -177,9 +188,20 @@ namespace Infrastructure.OpenTelemetry
         public bool EnableMetrics { get; set; } = true;
 
         /// <summary>
+        /// 是否启用 SigNoz OTLP 导出器
+        /// </summary>
+        public bool SigNozEnabled { get; set; } = true;
+
+        /// <summary>
+        /// SigNoz OTLP 采集端点（gRPC）
+        /// 默认：http://localhost:4317
+        /// </summary>
+        public string? SigNozOtlpEndpoint { get; set; } = "http://localhost:4317";
+
+        /// <summary>
         /// 是否启用 Jaeger 导出器
         /// </summary>
-        public bool JaegerEnabled { get; set; } = true;
+        public bool JaegerEnabled { get; set; } = false;
 
         /// <summary>
         /// Jaeger Agent 主机地址

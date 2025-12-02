@@ -1,0 +1,53 @@
+# Prometheus 配置文件
+# 与 docker-compose.otel.yml 一起使用
+
+global:
+  scrape_interval: 15s # 全局默认抓取间隔
+  evaluation_interval: 15s # 全局默认评估间隔
+  external_labels:
+    monitor: "api-gateway"
+
+# 告警规则文件
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# 抓取配置
+scrape_configs:
+  # API Gateway - Prometheus exporter
+  - job_name: "gateway"
+    scrape_interval: 3s # 更频繁地抓取网关指标
+    scrape_timeout: 10s
+    static_configs:
+      - targets: ["host.docker.internal:9090"] # 宿主机上的网关
+        labels:
+          service: "api-gateway"
+          env: "development"
+    # 重新标记配置
+    relabel_configs:
+      - source_labels: [__scheme__]
+        target_label: __scheme__
+        replacement: "http"
+
+  # Prometheus 自身指标
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+        labels:
+          service: "prometheus"
+
+  # Jaeger
+  - job_name: "jaeger"
+    static_configs:
+      - targets: ["jaeger:14269"]
+        labels:
+          service: "jaeger"
+# 关于 Windows Docker Desktop 的注意：
+# 如果运行在 Windows/Mac 上，使用以下方式访问宿主机：
+# - Linux: localhost
+# - Mac: docker.for.mac.host.internal
+# - Windows: host.docker.internal
+#
+# 例如，如果网关运行在 Windows 的 localhost:5000：
+# targets: ['host.docker.internal:9090']

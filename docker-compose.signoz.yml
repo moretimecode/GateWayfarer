@@ -1,0 +1,131 @@
+version: "3.8"
+
+services:
+  # Zookeeper - 用于 Kafka 协调
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    healthcheck:
+      test: ["CMD", "echo", "ruok", "|", "nc", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Kafka - 消息队列
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "kafka-broker-api-versions.sh",
+          "--bootstrap-server",
+          "kafka:29092",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ClickHouse - 时间序列数据库
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.1
+    environment:
+      CLICKHOUSE_DB: "signoz"
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ports:
+      - "9000:9000"
+      - "8123:8123"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - clickhouse-logs:/var/log/clickhouse-server
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # SigNoz - OpenTelemetry 采集器和 UI
+  signoz-otel-collector:
+    image: signoz/signoz-otel-collector:latest
+    depends_on:
+      - kafka
+      - clickhouse
+    environment:
+      GOGC: 80
+      CLICKHOUSE_SERVER: "http://clickhouse:8123"
+      KAFKA_BROKERS: kafka:29092
+    ports:
+      - "4317:4317" # OTLP gRPC receiver
+      - "4318:4318" # OTLP HTTP receiver
+      - "8888:8888" # Prometheus metrics
+      - "14250:14250" # Jaeger gRPC
+      - "14268:14268" # Jaeger HTTP
+    volumes:
+      - ./signoz-otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:13133/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # SigNoz 后端服务
+  signoz-backend:
+    image: signoz/signoz:latest
+    depends_on:
+      - clickhouse
+      - kafka
+    environment:
+      DOCKER_HOST: unix:///var/run/docker.sock
+      ClickhouseUrl: http://clickhouse:8123
+      KAFKA_BROKERS: kafka:29092
+      OTEL_EXPORTER_OTLP_ENABLED: true
+    ports:
+      - "3301:3301" # Query service port
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3301/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # SigNoz 前端 UI
+  signoz-frontend:
+    image: signoz/signoz-frontend:latest
+    depends_on:
+      - signoz-backend
+    environment:
+      SIGNOZ_API_URL: http://signoz-backend:3301
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  clickhouse-data:
+  clickhouse-logs:
+
+networks:
+  default:
+    name: signoz-network
